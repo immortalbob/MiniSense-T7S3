@@ -6,11 +6,13 @@ Hey Jarvis wake word detection — all processed on-device with no cloud depende
 
 The 2.42" SSD1309 OLED does double duty: displaying live sensor readings at idle, then 
 taking over with full-screen state transitions as the voice pipeline moves through 
-listening, processing, and responding phases — giving you clear visual feedback at a 
-glance without needing to check Home Assistant.
+listening, thinking, and responding phases — giving you clear visual feedback at a 
+glance without needing to check Home Assistant. If CO2 levels exceed the configured 
+threshold the display flashes a warning regardless of voice state.
 
 Designed as a self-contained room node that slots into an existing Home Assistant and 
 Ollama/Open WebUI local AI stack.
+
 ## Hardware
 
 | Component | Description |
@@ -25,7 +27,9 @@ Ollama/Open WebUI local AI stack.
 
 - Hey Jarvis wake word (on-device, no cloud)
 - Voice assistant via Home Assistant
-- Live OLED display — shows listening / processing / responding states during voice interaction, time / temperature / humidity when idle
+- Live OLED display — shows listening / thinking / responding states during voice interaction
+- Idle display shows time, room temperature, humidity, CO2, and WiFi signal bars
+- CO2 warning — display flashes when threshold is exceeded (default 1000ppm)
 - SCD40 sensors reported to Home Assistant
 - Board LED controllable from HA
 
@@ -49,6 +53,8 @@ Ollama/Open WebUI local AI stack.
 > **Note:** INMP441 and MAX98357 use separate I2S buses — mic on 15/16, speaker on 5/10. The hardware supports simultaneous audio in/out but ESPHome's voice assistant pipeline does not currently support barge-in; wake word detection resumes after the response finishes.
 
 > **Note:** INMP441 L/R must be tied to GND for left channel selection. MAX98357 SD must be tied to 3V3 to enable the amp.
+
+> **Note:** SCL is on pin 14 rather than the more common pin 17, which is reserved for the board LED.
 
 ## First Time Flash
 
@@ -119,16 +125,29 @@ No `--device` needed after first flash — updates over WiFi.
 | SCD40 no readings | Allow 3 minutes after boot for first measurement |
 | Compile error shadow warning | Ensure `-Wno-shadow` build flag is present |
 | Words clipped in response | Increase `buffer_duration` on speaker, lower `noise_suppression_level` |
+| CO2 warning not flashing | Confirm `uptime` sensor has `id: uptime_sensor` set |
 
 ## Voice Assistant States
 
 The OLED display takes over with large centered text during voice interaction:
 
 - **LISTENING** — wake word detected, mic active
-- **PROCESSING** — speech received, waiting on response
+- **THINKING** — speech received, waiting on response from Home Assistant
 - **RESPONDING** — TTS playing (held on screen for 4 seconds)
+- **CO2 HIGH** — flashes when CO2 exceeds threshold, overrides idle display
 - **Idle** — displays time, room temperature, humidity and CO2 in small text, WiFi signal bars in top right corner
-  
+
+## CO2 Threshold
+
+The warning threshold is set via the `co2_warning_threshold` global at the top of the config. Default is 1000ppm — the ASHRAE action threshold above which air quality begins to affect cognitive function. Adjust to suit your environment.
+
+| Level | Meaning |
+|-------|---------|
+| <1000ppm | Normal |
+| 1000ppm | Action threshold — open a window |
+| 1500ppm | Stuffy, ventilate now |
+| 2000ppm+ | Unhealthy |
+
 ## To Do
 
 ### mmWave Presence Detection
@@ -151,5 +170,3 @@ This will allow automations to detect occupancy even when the room occupant is s
 - Add binary sensors for presence and motion detection
 - Add sensor for detection distance
 - Update repo topics to include `ld2410` and `presence-detection`
-
-
