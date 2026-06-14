@@ -128,3 +128,28 @@ The OLED display takes over with large centered text during voice interaction:
 - **PROCESSING** — speech received, waiting on response
 - **RESPONDING** — TTS playing (held on screen for 4 seconds)
 - Idle — returns to time, temperature, humidity readout
+
+## To Do
+
+### mmWave Presence Detection
+
+Planned addition: HLK-LD2410B mmWave sensor for true presence detection (not just motion).
+This will allow automations to detect occupancy even when the room occupant is stationary.
+
+**Additional pin assignments:**
+
+| T7S3 Pin | Device | Device Pin |
+|----------|--------|------------|
+| 3V3 | LD2410B | VCC |
+| GND | LD2410B | GND |
+| 13 | LD2410B | RX |
+| 12 | LD2410B | TX |
+
+**Config changes required:**
+- Add `uart:` block with `tx_pin: 13`, `rx_pin: 12`, `baud_rate: 256000`
+- Add `ld2410` sensor platform block
+- Add binary sensors for presence and motion detection
+- Add sensor for detection distance
+- Update repo topics to include `ld2410` and `presence-detection`
+
+
