@@ -1,6 +1,40 @@
+# ============================================================
+# MiniSense-T7S3 — ESPHome Room Sensor Node
+# Hardware: LilyGo T7-S3 (ESP32-S3)
+# ============================================================
+# Components:
+#   - SSD1309 2.42" OLED (I2C, 128x64)
+#   - SCD40 CO2/Temperature/Humidity sensor (I2C)
+#   - INMP441 MEMS microphone (I2S)
+#   - MAX98357A Class D amplifier (I2S)
+#   - Hey Jarvis wake word (on-device, no cloud)
+#   - Voice assistant via Home Assistant
+#
+# Pin Assignments:
+#   3V3  → OLED VDD, SCD40 VDD, INMP441 VDD, MAX98357 SD
+#   GND  → OLED GND, SCD40 GND, INMP441 L/R, MAX98357 GND
+#   5V   → MAX98357 VIN
+#   14   → OLED SCL, SCD40 SCL (I2C bus)
+#   18   → OLED SDA, SCD40 SDA (I2C bus)
+#   15   → INMP441 WS  (I2S mic bus)
+#   16   → INMP441 SCK (I2S mic bus)
+#   8    → INMP441 SD
+#   5    → MAX98357 LRC  (I2S speaker bus)
+#   10   → MAX98357 BCLK (I2S speaker bus)
+#   7    → MAX98357 DIN
+#   17   → Board LED
+#
+# Notes:
+#   - INMP441 L/R must be tied to GND for left channel selection
+#   - MAX98357 SD must be tied to 3V3 to enable the amp
+#   - Mic and speaker use separate I2S buses for simultaneous audio
+#   - Wake word detection resumes after response finishes (no barge-in)
+#   - SCL is on pin 14 (not 17) to free GPIO17 for the board LED
+# ============================================================
+
 esphome:
-  name: MiniSense-T7S3
-  friendly_name: MiniSense-T7S3
+  name: MiniSense-t7s3
+  friendly_name: MiniSense-Room-Sensor
   platformio_options:
     build_flags:
       - "-Wno-shadow"
@@ -38,6 +72,7 @@ logger:
 
 api:
   encryption:
+    # Generate with: python -c "import base64, os; print(base64.b64encode(os.urandom(32)).decode())"
     key: "YOUR_BASE64_API_KEY"
 
 ota:
@@ -55,7 +90,19 @@ wifi:
 
 captive_portal:
 
+# ============================================================
+# THRESHOLDS
+# Adjust co2_warning_threshold to suit your environment.
+# 1000ppm is the ASHRAE action threshold — above this level
+# air quality begins to affect cognitive function noticeably.
+# 1500ppm is stuffy/headachy territory. 2000ppm+ is unhealthy.
+# The display will flash CO2 HIGH when the threshold is exceeded.
+# ============================================================
 globals:
+  - id: co2_warning_threshold
+    type: float
+    restore_value: no
+    initial_value: '1000'
   - id: va_state
     type: std::string
     restore_value: no
@@ -64,12 +111,27 @@ globals:
     type: int
     restore_value: no
     initial_value: '0'
+  - id: flash_state
+    type: bool
+    restore_value: no
+    initial_value: 'false'
 
+# ============================================================
+# I2C — OLED + SCD40
+# SDA: GPIO18  SCL: GPIO14
+# Both devices share this bus (addresses 0x3C and 0x62)
+# ============================================================
 i2c:
   sda: 18
   scl: 14
   scan: true
 
+# ============================================================
+# I2S — Separate buses for mic and speaker
+# Mic:    WS=GPIO15  BCLK=GPIO16  SD=GPIO8
+# Speaker: LRC=GPIO5  BCLK=GPIO10  DIN=GPIO7
+# Separate buses required for simultaneous listen/speak
+# ============================================================
 i2s_audio:
   - id: i2s_mic
     i2s_lrclk_pin: GPIO15
@@ -96,6 +158,25 @@ speaker:
     i2s_mode: primary
     buffer_duration: 500ms
 
+# ============================================================
+# CO2 WARNING — flashes display at 500ms interval when exceeded
+# ============================================================
+interval:
+  - interval: 500ms
+    then:
+      - if:
+          condition:
+            lambda: 'return id(co2).state >= id(co2_warning_threshold);'
+          then:
+            - lambda: 'id(flash_state) = !id(flash_state);'
+            - component.update: oled
+
+# ============================================================
+# WAKE WORD
+# Uses Hey Jarvis v2 model — more accurate than v1
+# VAD runs in parallel to reduce false triggers from
+# background noise (TV, music, etc)
+# ============================================================
 micro_wake_word:
   vad:
   models:
@@ -103,6 +184,13 @@ micro_wake_word:
   on_wake_word_detected:
     - voice_assistant.start:
 
+# ============================================================
+# VOICE ASSISTANT
+# State machine drives OLED display transitions:
+#   idle → listening → thinking → responding → idle
+# auto_gain reduced from 25dBFS — INMP441 is a hot mic,
+# higher values risk saturating the wake word model input
+# ============================================================
 voice_assistant:
   id: va
   microphone: va_mic
@@ -123,7 +211,7 @@ voice_assistant:
   on_stt_end:
     - globals.set:
         id: va_state
-        value: '"processing"'
+        value: '"thinking"'
     - component.update: oled
   on_tts_start:
     - globals.set:
@@ -146,6 +234,8 @@ voice_assistant:
     - delay: 2s
     - micro_wake_word.start:
 
+# Holds RESPONDING on screen for 4 seconds after TTS ends
+# prevents the display from flashing back to idle too quickly
 script:
   - id: hold_responding
     mode: restart
@@ -156,6 +246,10 @@ script:
           value: '"idle"'
       - component.update: oled
 
+# ============================================================
+# BOARD LED (GPIO17)
+# Controllable from Home Assistant, boots off
+# ============================================================
 output:
   - platform: gpio
     pin: GPIO17
@@ -168,6 +262,11 @@ switch:
     output: board_led
     restore_mode: ALWAYS_OFF
 
+# ============================================================
+# SENSORS
+# SCD40 reports to Home Assistant every ~5 seconds (default)
+# Allow 3 minutes after boot for first CO2 measurement
+# ============================================================
 sensor:
   - platform: scd4x
     co2:
@@ -181,6 +280,7 @@ sensor:
       id: room_humidity
   - platform: uptime
     name: "Uptime"
+    id: uptime_sensor
   - platform: wifi_signal
     name: "WiFi RSSI"
     id: wifi_rssi
@@ -194,6 +294,12 @@ time:
   - platform: homeassistant
     id: ha_time
 
+# ============================================================
+# FONTS
+# font1     — 14px, main display text
+# font_large — 20px, voice state transitions
+# font_small — 10px, humidity and CO2 bottom line
+# ============================================================
 font:
   - file: "gfonts://Roboto"
     id: font1
@@ -205,6 +311,14 @@ font:
     id: font_small
     size: 10
 
+# ============================================================
+# DISPLAY — SSD1309 2.42" 128x64 I2C
+#
+# Priority order:
+#   1. Voice state (listening / thinking / responding)
+#   2. CO2 warning (flashing if threshold exceeded)
+#   3. Idle readout (time, temp, humidity/CO2, wifi bars)
+# ============================================================
 display:
   - platform: ssd1306_i2c
     id: oled
@@ -217,17 +331,26 @@ display:
       if (id(va_state) == "listening") {
         it.fill(COLOR_OFF);
         it.printf(64, 24, id(font_large), TextAlign::CENTER, "LISTENING");
-      } else if (id(va_state) == "processing") {
+      } else if (id(va_state) == "thinking") {
         it.fill(COLOR_OFF);
-        it.printf(64, 24, id(font_large), TextAlign::CENTER, "PROCESSING");
+        it.printf(64, 24, id(font_large), TextAlign::CENTER, "THINKING");
       } else if (id(va_state) == "responding") {
         it.fill(COLOR_OFF);
         it.printf(64, 24, id(font_large), TextAlign::CENTER, "RESPONDING");
+      } else if (id(co2).state >= id(co2_warning_threshold)) {
+        if (id(flash_state)) {
+          it.fill(COLOR_ON);
+          it.printf(64, 24, id(font_large), TextAlign::CENTER, "CO2 HIGH");
+        } else {
+          it.fill(COLOR_OFF);
+          it.printf(64, 24, id(font_large), TextAlign::CENTER, "CO2 HIGH");
+        }
       } else {
         it.strftime(64, 10, id(font1), TextAlign::CENTER, "%I:%M %p", id(ha_time).now());
         it.printf(64, 30, id(font1), TextAlign::CENTER, "Room Temp: %.1fF", id(room_temp).state * 1.8 + 32);
         it.printf(127, 52, id(font_small), TextAlign::RIGHT, "H:%.0f%%  CO2:%4.0fppm", id(room_humidity).state, id(co2).state);
       }
+      // WiFi signal bars — top right corner
       int rssi = (int)id(wifi_rssi).state;
       int bars = 0;
       if (rssi > -50) bars = 4;
