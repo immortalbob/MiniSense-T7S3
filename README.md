@@ -127,8 +127,8 @@ The OLED display takes over with large centered text during voice interaction:
 - **LISTENING** — wake word detected, mic active
 - **PROCESSING** — speech received, waiting on response
 - **RESPONDING** — TTS playing (held on screen for 4 seconds)
-- Idle — returns to time, temperature, humidity readout
-
+- **Idle** — displays time, room temperature, humidity and CO2 in small text, WiFi signal bars in top right corner
+  
 ## To Do
 
 ### mmWave Presence Detection
