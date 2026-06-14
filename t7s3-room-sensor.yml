@@ -115,6 +115,19 @@ globals:
     type: bool
     restore_value: no
     initial_value: 'false'
+  # Phrase indices — picked at state transition, held for duration of state
+  - id: listening_phrase
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: thinking_phrase
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: responding_phrase
+    type: int
+    restore_value: no
+    initial_value: '0'
 
 # ============================================================
 # I2C — OLED + SCD40
@@ -128,7 +141,7 @@ i2c:
 
 # ============================================================
 # I2S — Separate buses for mic and speaker
-# Mic:    WS=GPIO15  BCLK=GPIO16  SD=GPIO8
+# Mic:     WS=GPIO15  BCLK=GPIO16  SD=GPIO8
 # Speaker: LRC=GPIO5  BCLK=GPIO10  DIN=GPIO7
 # Separate buses required for simultaneous listen/speak
 # ============================================================
@@ -156,7 +169,7 @@ speaker:
     i2s_dout_pin: GPIO7
     dac_type: external
     i2s_mode: primary
-    buffer_duration: 500ms
+    buffer_duration: 1500ms
 
 # ============================================================
 # CO2 WARNING — flashes display at 500ms interval when exceeded
@@ -188,8 +201,10 @@ micro_wake_word:
 # VOICE ASSISTANT
 # State machine drives OLED display transitions:
 #   idle → listening → thinking → responding → idle
+# Phrase index is picked at each state transition and held
+# for the duration of that state to prevent flickering.
 # auto_gain reduced from 25dBFS — INMP441 is a hot mic,
-# higher values risk saturating the wake word model input
+# higher values risk saturating the wake word model input.
 # ============================================================
 voice_assistant:
   id: va
@@ -197,26 +212,23 @@ voice_assistant:
   speaker: va_speaker
   noise_suppression_level: 1
   auto_gain: 20dBFS
-  volume_multiplier: 2.0
+  volume_multiplier: 1.0
   on_start:
-    - globals.set:
-        id: va_state
-        value: '"listening"'
+    - lambda: |-
+        id(va_state) = "listening";
+        id(listening_phrase) = random() % 20;
     - component.update: oled
   on_listening:
-    - globals.set:
-        id: va_state
-        value: '"listening"'
     - component.update: oled
   on_stt_end:
-    - globals.set:
-        id: va_state
-        value: '"thinking"'
+    - lambda: |-
+        id(va_state) = "thinking";
+        id(thinking_phrase) = random() % 20;
     - component.update: oled
   on_tts_start:
-    - globals.set:
-        id: va_state
-        value: '"responding"'
+    - lambda: |-
+        id(va_state) = "responding";
+        id(responding_phrase) = random() % 20;
     - component.update: oled
     - globals.set:
         id: responding_timer
@@ -296,7 +308,7 @@ time:
 
 # ============================================================
 # FONTS
-# font1     — 14px, main display text
+# font1      — 14px, main display text
 # font_large — 20px, voice state transitions
 # font_small — 10px, humidity and CO2 bottom line
 # ============================================================
@@ -318,6 +330,9 @@ font:
 #   1. Voice state (listening / thinking / responding)
 #   2. CO2 warning (flashing if threshold exceeded)
 #   3. Idle readout (time, temp, humidity/CO2, wifi bars)
+#
+# Each voice state picks a random phrase from 20 options
+# at transition time, held for the duration of the state.
 # ============================================================
 display:
   - platform: ssd1306_i2c
@@ -330,13 +345,79 @@ display:
     lambda: |-
       if (id(va_state) == "listening") {
         it.fill(COLOR_OFF);
-        it.printf(64, 24, id(font_large), TextAlign::CENTER, "LISTENING");
+        const char* listening[] = {
+          "YEAH?",
+          "GO AHEAD",
+          "WHAT'S UP?",
+          "SPEAK",
+          "READY",
+          "ONLINE",
+          "LISTENING",
+          "AWAITING",
+          "YES?",
+          "TELL ME",
+          "STANDBY",
+          "ENGAGED",
+          "RECEIVING",
+          "GO ON",
+          "I'M HERE",
+          "INPUT?",
+          "HEY?",
+          "YOUR TURN",
+          "UGH, WHAT?",
+          "FINE..."
+        };
+        it.printf(64, 24, id(font_large), TextAlign::CENTER, listening[id(listening_phrase)]);
       } else if (id(va_state) == "thinking") {
         it.fill(COLOR_OFF);
-        it.printf(64, 24, id(font_large), TextAlign::CENTER, "THINKING");
+        const char* thinking[] = {
+          "THINKING...",
+          "PROCESSING",
+          "ONE SEC",
+          "WORKING",
+          "CHECKING",
+          "SEARCHING",
+          "FETCHING",
+          "ANALYZING",
+          "COMPUTING",
+          "ON IT",
+          "STAND BY",
+          "CALCULATING",
+          "LOOKING",
+          "QUERYING",
+          "HOLD ON",
+          "ALMOST...",
+          "HMMM...",
+          "ASKING AI",
+          "GOOGLING",
+          "BRAIN HURTS"
+        };
+        it.printf(64, 24, id(font_large), TextAlign::CENTER, thinking[id(thinking_phrase)]);
       } else if (id(va_state) == "responding") {
         it.fill(COLOR_OFF);
-        it.printf(64, 24, id(font_large), TextAlign::CENTER, "RESPONDING");
+        const char* responding[] = {
+          "RESPONDING",
+          "FOUND IT",
+          "HERE YA GO",
+          "GOOD ONE",
+          "LISTEN UP",
+          "ROGER",
+          "TRANSMIT",
+          "OUTPUT",
+          "SPEAKING",
+          "DELIVERING",
+          "GOT IT",
+          "DONE",
+          "THERE IT IS",
+          "THAT'S IT",
+          "BOOM",
+          "ALL SET",
+          "NO PROBLEM",
+          "YOU BET",
+          "ENJOY",
+          "HOPE SO"
+        };
+        it.printf(64, 24, id(font_large), TextAlign::CENTER, responding[id(responding_phrase)]);
       } else if (id(co2).state >= id(co2_warning_threshold)) {
         if (id(flash_state)) {
           it.fill(COLOR_ON);
