@@ -46,7 +46,7 @@ Ollama/Open WebUI local AI stack.
 | 7 | MAX98357 | DIN |
 | 17 | Board LED | — |
 
-> **Note:** OLED and SCD40 share the I2C bus (pins 14/18). INMP441 and MAX98357 use separate I2S buses — mic on 15/16, speaker on 5/10 — so simultaneous listen and speak works correctly.
+> **Note:** INMP441 and MAX98357 use separate I2S buses — mic on 15/16, speaker on 5/10. The hardware supports simultaneous audio in/out but ESPHome's voice assistant pipeline does not currently support barge-in; wake word detection resumes after the response finishes.
 
 > **Note:** INMP441 L/R must be tied to GND for left channel selection. MAX98357 SD must be tied to 3V3 to enable the amp.
 
