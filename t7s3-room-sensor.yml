@@ -356,7 +356,7 @@ display:
           "AWAITING",
           "YES?",
           "TELL ME",
-          "STANDBY",
+          "USE WORDS",
           "ENGAGED",
           "RECEIVING",
           "GO ON",
@@ -388,9 +388,9 @@ display:
           "HOLD ON",
           "ALMOST...",
           "HMMM...",
-          "ASKING AI",
+          "UNDERSTOOD",
           "GOOGLING",
-          "BRAIN HURTS"
+          "READING"
         };
         it.printf(64, 24, id(font_large), TextAlign::CENTER, thinking[id(thinking_phrase)]);
       } else if (id(va_state) == "responding") {
@@ -399,7 +399,7 @@ display:
           "RESPONDING",
           "FOUND IT",
           "HERE YA GO",
-          "GOOD ONE",
+          "SERVING UP",
           "LISTEN UP",
           "ROGER",
           "TRANSMIT",
@@ -410,12 +410,12 @@ display:
           "DONE",
           "THERE IT IS",
           "THAT'S IT",
-          "BOOM",
+          "ANSWERING",
           "ALL SET",
           "NO PROBLEM",
-          "YOU BET",
+          "YOU BETCHA",
           "ENJOY",
-          "HOPE SO"
+          "HOPE IT HELPS"
         };
         it.printf(64, 24, id(font_large), TextAlign::CENTER, responding[id(responding_phrase)]);
       } else if (id(co2).state >= id(co2_warning_threshold)) {
