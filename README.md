@@ -1,8 +1,16 @@
 # MiniSense-T7S3
 
+An ESPHome-based room sensor node built on the LilyGo T7-S3 (ESP32-S3). Combines CO2, 
+temperature, and humidity monitoring with a fully local voice assistant pipeline using 
+Hey Jarvis wake word detection — all processed on-device with no cloud dependency.
 
-An ESPHome-based room sensor node built on the LilyGo T7-S3 (ESP32-S3). Combines CO2, temperature, and humidity monitoring with a local voice assistant pipeline using Hey Jarvis wake word detection.
+The 2.42" SSD1309 OLED does double duty: displaying live sensor readings at idle, then 
+taking over with full-screen state transitions as the voice pipeline moves through 
+listening, processing, and responding phases — giving you clear visual feedback at a 
+glance without needing to check Home Assistant.
 
+Designed as a self-contained room node that slots into an existing Home Assistant and 
+Ollama/Open WebUI local AI stack.
 ## Hardware
 
 | Component | Description |
