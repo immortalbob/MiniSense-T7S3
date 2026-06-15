@@ -127,6 +127,7 @@ No `--device` needed after first flash — updates over WiFi.
 | Compile error shadow warning | Ensure `-Wno-shadow` build flag is present |
 | Words clipped in response | Increase `buffer_duration` on speaker, lower `noise_suppression_level` |
 | CO2 warning not flashing | Confirm `uptime` sensor has `id: uptime_sensor` set |
+| Temperature reads wrong | Adjust `temperature_offset` in the scd4x sensor block. Default is 0 — increase if reading high, decrease if reading low. The SCD40 datasheet suggests 4°C but enclosure and nearby components affect this. Compare against a known reference and tune accordingly. |
 
 ## Voice Assistant States
 
@@ -153,21 +154,23 @@ The warning threshold is set via the `co2_warning_threshold` global at the top o
 
 ### mmWave Presence Detection
 
-Planned addition: HLK-LD2410B mmWave sensor for true presence detection (not just motion).
-This will allow automations to detect occupancy even when the room occupant is stationary.
+Planned addition: DFRobot Fermion C4002 mmWave Human Presence Sensor for true presence detection (not just motion). Detects static presence up to 10m and motion up to 11m using 24GHz FMCW radar. Includes an integrated ambient light sensor (0-50 lux) enabling condition-based automations without a separate light sensor.
+
+Native ESPHome support with verified YAML provided by DFRobot.
 
 **Additional pin assignments:**
 
 | T7S3 Pin | Device | Device Pin |
 |----------|--------|------------|
-| 3V3 | LD2410B | VCC |
-| GND | LD2410B | GND |
-| 13 | LD2410B | RX |
-| 12 | LD2410B | TX |
+| 3V3 | C4002 | VCC |
+| GND | C4002 | GND |
+| 13 | C4002 | RX |
+| 12 | C4002 | TX |
 
 **Config changes required:**
-- Add `uart:` block with `tx_pin: 13`, `rx_pin: 12`, `baud_rate: 256000`
-- Add `ld2410` sensor platform block
+- Add `uart:` block with `tx_pin: 13`, `rx_pin: 12`, baud rate per DFRobot ESPHome guide
+- Add C4002 sensor platform block per DFRobot verified YAML
 - Add binary sensors for presence and motion detection
-- Add sensor for detection distance
-- Update repo topics to include `ld2410` and `presence-detection`
+- Add sensor for detection distance and illuminance
+- Add presence indicator to OLED display (top left corner)
+- Update repo topics to include `c4002`, `mmwave`, and `presence-detection`
