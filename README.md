@@ -32,6 +32,7 @@ Ollama/Open WebUI local AI stack.
 - Idle display shows time, room temperature, humidity, CO2, and WiFi signal bars
 - CO2 warning — display flashes when threshold is exceeded (default 1000ppm)
 - SCD40 sensors reported to Home Assistant
+- ESP32-S3 internal die temperature reported to Home Assistant
 - Board LED controllable from HA
 
 ## Pin Assignments
@@ -114,6 +115,57 @@ esphome run t7s3-room-sensor.yml
 
 No `--device` needed after first flash — updates over WiFi.
 
+## Configuration
+
+All tunable options are documented inline in `t7s3-room-sensor.yml`. Key settings:
+
+**CO2 Warning Threshold**
+Set via `co2_warning_threshold` global at the top of the config. Default 1000ppm — the ASHRAE action threshold above which air quality begins to affect cognitive function.
+
+| Level | Meaning |
+|-------|---------|
+| <1000ppm | Normal |
+| 1000ppm | Action threshold — open a window |
+| 1500ppm | Stuffy, ventilate now |
+| 2000ppm+ | Unhealthy |
+
+**SCD40 Sensor**
+
+| Option | Default | Notes |
+|--------|---------|-------|
+| `temperature_offset` | 0 | Adjust if readings drift from a reference. Tested at 0 for this enclosure — self-heating negligible |
+| `altitude_compensation` | 0m | Set to your elevation in meters for more accurate CO2 readings. Find yours at whatismyelevation.com |
+| `automatic_self_calibration` | false | Disabled — assumes sensor is always indoors and never sees fresh outdoor air |
+| `measurement_mode` | periodic | Switch to `low_power` for battery operation (30s intervals vs 5s) |
+
+**Display**
+
+| Option | Default | Notes |
+|--------|---------|-------|
+| `brightness` | 100% | Reduce if display is too bright in a dark room |
+| `update_interval` | 500ms | How often the display redraws |
+| `invert` | false | White background, black text — useful in high ambient light |
+
+**Audio**
+
+| Option | Default | Notes |
+|--------|---------|-------|
+| `auto_gain` | 20dBFS | Reduced from 25dBFS — INMP441 is a hot mic, higher values risk saturating the wake word model |
+| `noise_suppression_level` | 1 | 0-4, increase if background noise causes false triggers |
+| `buffer_duration` | 1500ms | Increase if words are clipped at the start of responses |
+| `timeout` | 500ms | How long after playback ends before speaker task suspends |
+| `use_apll` | true | ESP32 Audio PLL for more accurate clock timing on both mic and speaker |
+
+## Voice Assistant States
+
+The OLED display takes over with large centered text during voice interaction. Each state picks randomly from 20 phrases at transition time and holds it for the duration of the state — keeping interactions fresh without flickering.
+
+- **LISTENING** — wake word detected, mic active (e.g. "YEAH?", "GO AHEAD", "I'M HERE")
+- **THINKING** — speech received, waiting on response from Home Assistant (e.g. "ON IT", "HMMM...", "CRUNCHING")
+- **RESPONDING** — TTS playing, held on screen for 4 seconds (e.g. "HERE YA GO", "NO PROBLEM", "ON THE AIR")
+- **CO2 HIGH** — flashes when CO2 exceeds threshold, overrides idle display
+- **Idle** — displays time, room temperature, humidity and CO2 in small text, WiFi signal bars in top right corner
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -124,37 +176,17 @@ No `--device` needed after first flash — updates over WiFi.
 | No speaker output | Check MAX98357 SD pin is on 3V3 |
 | OLED blank | Confirm I2C address 0x3C, check pins 14/18 |
 | SCD40 no readings | Allow 3 minutes after boot for first measurement |
+| Temperature reads wrong | Adjust `temperature_offset` in scd4x block. Compare against a known reference |
+| CO2 reads wrong | Set `altitude_compensation` to your elevation in meters |
 | Compile error shadow warning | Ensure `-Wno-shadow` build flag is present |
-| Words clipped in response | Increase `buffer_duration` on speaker, lower `noise_suppression_level` |
-| CO2 warning not flashing | Confirm `uptime` sensor has `id: uptime_sensor` set |
-| Temperature reads wrong | Adjust `temperature_offset` in the scd4x sensor block. Default is 0 — increase if reading high, decrease if reading low. The SCD40 datasheet suggests 4°C but enclosure and nearby components affect this. Compare against a known reference and tune accordingly. |
-
-## Voice Assistant States
-
-The OLED display takes over with large centered text during voice interaction. Each state picks randomly from 20 phrases at transition time and holds it for the duration of the state — keeping interactions fresh without flickering.
-
-- **LISTENING** — wake word detected, mic active (e.g. "YEAH?", "GO AHEAD", "I'M HERE")
-- **THINKING** — speech received, waiting on response from Home Assistant (e.g. "ON IT", "HMMM...", "BRAIN HURTS")
-- **RESPONDING** — TTS playing, held on screen for 4 seconds (e.g. "BOOM", "HERE YA GO", "HOPE SO")
-- **CO2 HIGH** — flashes when CO2 exceeds threshold, overrides idle display
-- **Idle** — displays time, room temperature, humidity and CO2 in small text, WiFi signal bars in top right corner
-
-## CO2 Threshold
-
-The warning threshold is set via the `co2_warning_threshold` global at the top of the config. Default is 1000ppm — the ASHRAE action threshold above which air quality begins to affect cognitive function. Adjust to suit your environment.
-
-| Level | Meaning |
-|-------|---------|
-| <1000ppm | Normal |
-| 1000ppm | Action threshold — open a window |
-| 1500ppm | Stuffy, ventilate now |
-| 2000ppm+ | Unhealthy |
+| Words clipped in response | Increase `buffer_duration`, lower `noise_suppression_level` |
+| Audio crackling | Try setting `use_apll: false` on mic and speaker |
 
 ## To Do
 
 ### mmWave Presence Detection
 
-Planned addition: DFRobot Fermion C4002 mmWave Human Presence Sensor for true presence detection (not just motion). Detects static presence up to 10m and motion up to 11m using 24GHz FMCW radar. Built-in adaptive noise filtering ignores ceiling fans, curtains, and plants.
+Planned addition: DFRobot Fermion C4002 mmWave Human Presence Sensor for true presence detection (not just motion). Detects static presence up to 10m and motion up to 11m using 24GHz FMCW radar. Includes an integrated ambient light sensor (0-50 lux) enabling condition-based automations without a separate light sensor. Built-in adaptive noise filtering ignores ceiling fans, curtains, and plants.
 
 Uses a DFRobot external ESPHome component — not a native ESPHome platform. Source: https://github.com/cdjq/Home_Assistant_C4002
 
@@ -196,24 +228,19 @@ sensor:
     c4002_id: my_c4002
     movement_distance:
       name: "Motion Distance"
-      id: movement_distance_sensor
       unit_of_measurement: "m"
       accuracy_decimals: 2
     existing_distance:
       name: "Presence Distance"
-      id: existing_distance_sensor
       unit_of_measurement: "m"
       accuracy_decimals: 2
     movement_speed:
       name: "Motion Speed"
-      id: movement_speed_sensor
     movement_direction:
       name: "Motion Direction"
-      id: movement_direction_sensor
       internal: true
     target_status:
       name: "Target Status"
-      id: target_status_sensor
       internal: true
 
 text_sensor:
@@ -276,15 +303,9 @@ select:
 - `movement_speed` — speed of moving target
 - `movement_direction` — Away / No Direction / Approaching
 - `target_status` — No Target / Static Presence / Motion
+- Light threshold configurable via number platform (lux sensor)
 
-**Available controls:**
-- Factory Reset
-- Environmental Calibration — triggers noise learning
-- OUT Mode — Mode 1/2/3 (sensitivity/range presets)
-- Configurable min/max detection range and exclusion zones (commented out, enable as needed)
-- Light threshold configurable (lux sensor accessible via the number platform)
-
-**Additional config changes:**
+**Additional config changes once added:**
 - Add presence indicator to OLED display (top left corner)
 - Add binary sensor for occupied/vacant derived from `target_status`
 - Update repo topics to include `c4002`, `mmwave`, and `presence-detection`
