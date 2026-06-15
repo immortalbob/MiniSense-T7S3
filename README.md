@@ -308,4 +308,5 @@ select:
 **Additional config changes once added:**
 - Add presence indicator to OLED display (top left corner)
 - Add binary sensor for occupied/vacant derived from `target_status`
+- Auto dim OLED display when ambient light drops below lux threshold — use `light_threshold` number entity to set the trigger level and adjust `brightness` on the display component accordingly
 - Update repo topics to include `c4002`, `mmwave`, and `presence-detection`
