@@ -207,7 +207,7 @@ Uses a DFRobot external ESPHome component — not a native ESPHome platform. Sou
 external_components:
   - source:
       type: git
-      url: https://github.com/cdjq/esphome.git
+      url: https://github.com/immortalbob/esphome-dfrobot-c4002.git
       ref: dev
     components:
       - dfrobot_c4002
