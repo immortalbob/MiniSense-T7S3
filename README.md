@@ -190,6 +190,8 @@ Planned addition: DFRobot Fermion C4002 mmWave Human Presence Sensor for true pr
 
 Uses a DFRobot external ESPHome component — not a native ESPHome platform. Source: https://github.com/cdjq/Home_Assistant_C4002
 
+> **Status:** Hardware confirmed working (OUT LED active on presence detection). ESPHome component integration causes boot instability on this hardware combination — likely a memory conflict between the C4002 component and the micro_wake_word pipeline. Removed pending component maturity or a workaround. Pin assignments and config blocks documented below for future integration.
+
 **Important:** After first boot or reset, leave the room within 10 seconds and wait 40 seconds for ambient noise calibration.
 
 **Additional pin assignments:**
@@ -305,6 +307,11 @@ select:
 - `target_status` — No Target / Static Presence / Motion
 - Light threshold configurable via number platform (lux sensor)
 
+**Additional config changes once resolved:**
+- Add presence indicator to OLED display (top left corner)
+- Add binary sensor for occupied/vacant derived from `target_status`
+- Auto dim OLED display when ambient light drops below lux threshold
+- Update repo topics to include `c4002`, `mmwave`, and `presence-detection`
 **Additional config changes once added:**
 - Add presence indicator to OLED display (top left corner)
 - Add binary sensor for occupied/vacant derived from `target_status`
