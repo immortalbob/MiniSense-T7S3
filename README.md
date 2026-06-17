@@ -317,3 +317,9 @@ select:
 - Add binary sensor for occupied/vacant derived from `target_status`
 - Auto dim OLED display when ambient light drops below lux threshold — use `light_threshold` number entity to set the trigger level and adjust `brightness` on the display component accordingly
 - Update repo topics to include `c4002`, `mmwave`, and `presence-detection`
+
+  
+## Part of the MiniNet stack
+
+- [MiniSearch](https://github.com/immortalbob/MiniSearch) — unified local knowledge search API
+- [MiniSearch Intents](https://github.com/immortalbob/minisearch_intents) — native Home Assistant LLM integration for MiniSearch
