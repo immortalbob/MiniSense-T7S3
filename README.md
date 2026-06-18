@@ -322,4 +322,4 @@ select:
 ## Part of the Mnemo-Net stack
 
 - [Mnemolis](https://github.com/immortalbob/Mnemolis) — unified local knowledge search API
-- [Mnemolis Intents](https://github.com/immortalbob/Mnemolis_Intents) — native Home Assistant LLM integration for MiniSearch
+- [Mnemolis Intents](https://github.com/immortalbob/Mnemolis_Intents) — native Home Assistant LLM integration for Mnemolis
